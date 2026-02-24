@@ -14,9 +14,9 @@ const initialAssets = [
 ];
 
 const initialTransactions = [
-  { id: 1, type: "income", category: "other", owner: "joint", amount: 7000, note: "春节红包", date: "2026-02-10" },
-  { id: 2, type: "expense", category: "other", owner: "female", amount: 9700, note: "春节红包", date: "2026-02-10" },
-  { id: 3, type: "expense", category: "other", owner: "male", amount: 7700, note: "春节红包", date: "2026-02-15" },
+  { id: 1, type: "income", category: "income_other", owner: "joint", amount: 7000, note: "春节红包", date: "2026-02-10" },
+  { id: 2, type: "expense", category: "redpacket", owner: "female", amount: 9700, note: "春节红包", date: "2026-02-10" },
+  { id: 3, type: "expense", category: "redpacket", owner: "male", amount: 7700, note: "春节红包", date: "2026-02-15" },
 ];
 
 // ─── Config ────────────────────────────────────────────────────────────────
@@ -30,9 +30,20 @@ const assetTypeConfig = {
 };
 
 const txCategoryConfig = {
+  // Income
   salary:     { label: "工资", icon: "💼" },
+  bonus:      { label: "奖金", icon: "🏆" },
+  dividend:   { label: "分红", icon: "💰" },
   investment: { label: "投资收益", icon: "📈" },
-  living:     { label: "生活支出", icon: "🛒" },
+  income_other: { label: "其他(收入)", icon: "📌" },
+  // Expense
+  rent:       { label: "房租", icon: "🏠" },
+  water:      { label: "水电", icon: "💧" },
+  car:        { label: "车贷", icon: "🚗" },
+  food:       { label: "伙食", icon: "🍚" },
+  dining:     { label: "请客吃饭", icon: "🍽️" },
+  shopping:   { label: "购物", icon: "🛍️" },
+  redpacket:  { label: "春节红包", icon: "🧧" },
   other:      { label: "其他", icon: "📌" },
 };
 
@@ -456,7 +467,15 @@ function TransactionsPage({ transactions, onAdd, onEdit, onDelete }) {
             <button style={S.seg(txType === "expense")} onClick={() => setTxType("expense")}>💸 支出</button>
           </div>
           <select style={S.select} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-            {Object.entries(txCategoryConfig).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+            {Object.entries(txCategoryConfig)
+              .filter(([k]) => {
+                if (txType === "income") {
+                  return ["salary", "bonus", "dividend", "investment", "income_other"].includes(k);
+                } else {
+                  return ["rent", "water", "car", "food", "dining", "shopping", "redpacket", "other"].includes(k);
+                }
+              })
+              .map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
           </select>
           <select style={S.select} value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })}>
             <option value="male">👨 小王</option>
