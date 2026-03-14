@@ -1,32 +1,12 @@
-import { useState } from "react";
-
-// ─── Initial Data ──────────────────────────────────────────────────────────
-const initialAssets = [
-  { id: 1, name: "ESOP", type: "stock", owner: "male", amount: 863500, note: "长期持有" },
-  { id: 2, name: "ESOP", type: "stock", owner: "female", amount: 863500, note: "" },
-  { id: 3, name: "ESOP1", type: "stock", owner: "female", amount: 314000, note: "" },
-  { id: 4, name: "招商银行存款", type: "deposit", owner: "female", amount: 307000, note: "工资卡" },
-  { id: 5, name: "工商银行存款", type: "deposit", owner: "male", amount: 100000, note: "工资卡" },
-  { id: 6, name: "嫁妆", type: "dowry", owner: "male", amount: 400000, note: "小王婚前财产" },
-  { id: 7, name: "投资借款", type: "receivable", owner: "male", amount: 500000, note: "" },
-  { id: 8, name: "工资收入", type: "salary", owner: "male", amount: 44300, note: "月薪" },
-  { id: 9, name: "工资收入", type: "salary", owner: "female", amount: 38500, note: "月薪" },
-];
-
-const initialTransactions = [
-  { id: 1, type: "income", category: "income_other", owner: "joint", amount: 7000, note: "春节红包", date: "2026-02-10" },
-  { id: 2, type: "expense", category: "redpacket", owner: "female", amount: 9700, note: "春节红包", date: "2026-02-10" },
-  { id: 3, type: "expense", category: "redpacket", owner: "male", amount: 7700, note: "春节红包", date: "2026-02-15" },
-];
+import { useEffect, useState } from "react";
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const assetTypeConfig = {
-  stock:      { label: "股票",     icon: "📈", color: "#34C759" },
-  deposit:    { label: "存款",     icon: "🏦", color: "#007AFF" },
-  dowry:      { label: "嫁妆",     icon: "💍", color: "#FF2D55" },
-  receivable: { label: "应收借款", icon: "📋", color: "#FF9500" },
-  salary:     { label: "工资收入", icon: "💰", color: "#5AC8FA" },
-  other:      { label: "其他",     icon: "📦", color: "#8E8E93" },
+  CASH:  { label: "现金", icon: "💵", color: "#34C759" },
+  BANK:  { label: "存款", icon: "🏦", color: "#007AFF" },
+  STOCK: { label: "股票", icon: "📈", color: "#34C759" },
+  ESOP:  { label: "ESOP", icon: "📊", color: "#5AC8FA" },
+  OTHER: { label: "其他", icon: "📦", color: "#8E8E93" },
 };
 
 const txCategoryConfig = {
@@ -54,6 +34,22 @@ const fmtShort = (n) => {
   return "¥" + n.toLocaleString("zh-CN");
 };
 const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+const ownerLabel = (owner, members) => {
+  if (owner === "joint") return "共同";
+  const m = members.find((x) => String(x.userId) === String(owner));
+  return m?.displayName || owner;
+};
+const ownerBadgeStyle = (owner, members) => {
+  if (owner === "joint") return { background: "#8E8E9322", color: "#8E8E93" };
+  const idx = members.findIndex((x) => String(x.userId) === String(owner));
+  const palette = [
+    { background: "#007AFF22", color: "#007AFF" },
+    { background: "#FF2D5522", color: "#FF2D55" },
+    { background: "#34C75922", color: "#34C759" },
+    { background: "#FF950022", color: "#FF9500" },
+  ];
+  return palette[(idx >= 0 ? idx : 0) % palette.length];
+};
 
 // ─── Donut Chart ───────────────────────────────────────────────────────────
 function DonutChart({ data, size = 120 }) {
@@ -192,14 +188,17 @@ const S = {
 };
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
-function Dashboard({ assets, transactions, perspective, setPerspective }) {
+function Dashboard({ assets, transactions, perspective, setPerspective, members }) {
   const filter = (arr) =>
     perspective === "total" ? arr : arr.filter((a) => a.owner === perspective || a.owner === "joint");
 
   const filteredAssets = filter(assets);
   const total = sum(filteredAssets.map((a) => a.amount));
-  const maleTotal = sum(assets.filter((a) => a.owner === "male").map((a) => a.amount));
-  const femaleTotal = sum(assets.filter((a) => a.owner === "female").map((a) => a.amount));
+  const byMember = members.map((m) => ({
+    userId: m.userId,
+    displayName: m.displayName,
+    total: sum(assets.filter((a) => String(a.owner) === String(m.userId)).map((a) => a.amount)),
+  }));
 
   const byType = Object.entries(assetTypeConfig).map(([key, cfg]) => ({
     label: cfg.label, color: cfg.color,
@@ -208,10 +207,20 @@ function Dashboard({ assets, transactions, perspective, setPerspective }) {
 
   const heroColors = {
     total: ["#1C1C1E", "#3A3A3C"],
-    male: ["#007AFF", "#0A5ADB"],
-    female: ["#FF2D55", "#C2002E"],
   };
-  const heroLabels = { total: "💑 总资产", male: "👨 小王资产", female: "👩 小徐资产" };
+  members.forEach((m, idx) => {
+    const palette = [
+      ["#007AFF", "#0A5ADB"],
+      ["#FF2D55", "#C2002E"],
+      ["#34C759", "#1E9E43"],
+      ["#FF9500", "#C76A00"],
+    ];
+    heroColors[String(m.userId)] = palette[idx % palette.length];
+  });
+  const heroLabels = {
+    total: "💑 总资产",
+    ...Object.fromEntries(members.map((m) => [String(m.userId), `${m.displayName}资产`])),
+  };
 
   const now = new Date().toISOString().slice(0, 7);
   const monthIncome = sum(transactions.filter((t) => t.type === "income" && t.date.startsWith(now)).map((t) => t.amount));
@@ -221,28 +230,28 @@ function Dashboard({ assets, transactions, perspective, setPerspective }) {
   return (
     <div style={S.page}>
       <div style={S.segControl}>
-        {[["total","总资产"],["male","👨 小王"],["female","👩 小徐"]].map(([v, l]) => (
+        {[
+          ["total", "总资产"],
+          ...members.map((m) => [String(m.userId), m.displayName]),
+        ].map(([v, l]) => (
           <button key={v} style={S.seg(perspective === v)} onClick={() => setPerspective(v)}>{l}</button>
         ))}
       </div>
 
       <div style={S.heroCard(...heroColors[perspective])}>
         <div style={{ position: "absolute", right: -10, top: -10, opacity: 0.07, fontSize: 110, lineHeight: 1 }}>
-          {perspective === "male" ? "👨" : perspective === "female" ? "👩" : "💑"}
+          {perspective === "total" ? "💑" : "👤"}
         </div>
         <div style={S.heroLabel}>{heroLabels[perspective]}</div>
         <div style={S.heroAmount}>{fmtShort(total)}</div>
         {perspective === "total" && (
-          <div style={{ display: "flex", gap: 28 }}>
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 2 }}>小王</div>
-              <div style={{ fontSize: 17, fontWeight: 600 }}>{fmtShort(maleTotal)}</div>
-            </div>
-            <div style={{ width: 1, background: "rgba(255,255,255,0.2)" }} />
-            <div>
-              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 2 }}>小徐</div>
-              <div style={{ fontSize: 17, fontWeight: 600 }}>{fmtShort(femaleTotal)}</div>
-            </div>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            {byMember.map((m) => (
+              <div key={m.userId}>
+                <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 2 }}>{m.displayName}</div>
+                <div style={{ fontSize: 17, fontWeight: 600 }}>{fmtShort(m.total)}</div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -292,7 +301,7 @@ function Dashboard({ assets, transactions, perspective, setPerspective }) {
                   {t.note || cat.label}
                 </div>
                 <div style={{ fontSize: 12, color: "#8E8E93", marginTop: 2 }}>
-                  {t.date} · {t.owner === "joint" ? "共同" : t.owner === "male" ? "小王" : "小徐"}
+                  {t.date} · {ownerLabel(t.owner, members)}
                 </div>
               </div>
               <div style={{ fontSize: 16, fontWeight: 700, color: t.type === "income" ? "#34C759" : "#FF3B30", marginLeft: 8, flexShrink: 0 }}>
@@ -307,15 +316,15 @@ function Dashboard({ assets, transactions, perspective, setPerspective }) {
 }
 
 // ─── Assets Page ───────────────────────────────────────────────────────────
-function AssetsPage({ assets, onAdd, onEdit, onDelete }) {
+function AssetsPage({ assets, members, onAdd, onEdit, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ name: "", type: "deposit", owner: "male", amount: "", note: "" });
+  const [form, setForm] = useState({ name: "", type: "BANK", owner: "joint", amount: "", note: "" });
 
   const toggleForm = () => {
     if (showForm) {
       setEditingId(null);
-      setForm({ name: "", type: "deposit", owner: "male", amount: "", note: "" });
+      setForm({ name: "", type: "BANK", owner: "joint", amount: "", note: "" });
     }
     setShowForm(!showForm);
   };
@@ -328,7 +337,7 @@ function AssetsPage({ assets, onAdd, onEdit, onDelete }) {
       onAdd({ ...form, amount: parseFloat(form.amount), id: Date.now() });
     }
     setEditingId(null);
-    setForm({ name: "", type: "deposit", owner: "male", amount: "", note: "" });
+    setForm({ name: "", type: "BANK", owner: "joint", amount: "", note: "" });
     setShowForm(false);
   };
 
@@ -359,8 +368,10 @@ function AssetsPage({ assets, onAdd, onEdit, onDelete }) {
             {Object.entries(assetTypeConfig).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
           </select>
           <select style={S.select} value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })}>
-            <option value="male">👨 小王</option>
-            <option value="female">👩 小徐</option>
+            <option value="joint">👫 共同</option>
+            {members.map((m) => (
+              <option key={m.userId} value={String(m.userId)}>{m.displayName}</option>
+            ))}
           </select>
           <input style={S.input} type="number" placeholder="金额（元）" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <input style={S.input} placeholder="备注（选填）" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
@@ -379,17 +390,16 @@ function AssetsPage({ assets, onAdd, onEdit, onDelete }) {
               合计 {fmtShort(sum(items.map((a) => a.amount)))}
             </span>
           </div>
-          {items.map((a, i) => (
+          {items.map((a) => (
             <div key={a.id} style={{ ...S.listItem, borderTop: "1px solid #F2F2F7", borderBottom: "none" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                   <span style={{ fontSize: 15, fontWeight: 500 }}>{a.name}</span>
                   <span style={{
                     fontSize: 10, padding: "2px 7px", borderRadius: 10, fontWeight: 600,
-                    background: a.owner === "male" ? "#007AFF22" : "#FF2D5522",
-                    color: a.owner === "male" ? "#007AFF" : "#FF2D55",
+                    ...ownerBadgeStyle(a.owner, members),
                   }}>
-                    {a.owner === "male" ? "小王" : "小徐"}
+                    {ownerLabel(a.owner, members)}
                   </span>
                 </div>
                 {a.note && <div style={{ fontSize: 12, color: "#8E8E93" }}>{a.note}</div>}
@@ -414,19 +424,19 @@ function AssetsPage({ assets, onAdd, onEdit, onDelete }) {
 }
 
 // ─── Transactions Page ─────────────────────────────────────────────────────
-function TransactionsPage({ transactions, onAdd, onEdit, onDelete }) {
+function TransactionsPage({ transactions, members, onAdd, onEdit, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [txType, setTxType] = useState("income");
   const [form, setForm] = useState({
-    category: "salary", owner: "male", amount: "", note: "",
+    category: "salary", owner: "joint", amount: "", note: "",
     date: new Date().toISOString().slice(0, 10),
   });
 
   const toggleForm = () => {
     if (showForm) {
       setEditingId(null);
-      setForm({ category: "salary", owner: "male", amount: "", note: "", date: new Date().toISOString().slice(0, 10) });
+      setForm({ category: "salary", owner: "joint", amount: "", note: "", date: new Date().toISOString().slice(0, 10) });
     }
     setShowForm(!showForm);
   };
@@ -478,9 +488,10 @@ function TransactionsPage({ transactions, onAdd, onEdit, onDelete }) {
               .map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
           </select>
           <select style={S.select} value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })}>
-            <option value="male">👨 小王</option>
-            <option value="female">👩 小徐</option>
             <option value="joint">👫 共同</option>
+            {members.map((m) => (
+              <option key={m.userId} value={String(m.userId)}>{m.displayName}</option>
+            ))}
           </select>
           <input style={S.input} type="number" placeholder="金额（元）" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <input style={S.input} placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
@@ -500,7 +511,7 @@ function TransactionsPage({ transactions, onAdd, onEdit, onDelete }) {
                   {t.note || cat.label}
                 </div>
                 <div style={{ fontSize: 12, color: "#8E8E93", marginTop: 2 }}>
-                  {t.date} · {t.owner === "joint" ? "共同" : t.owner === "male" ? "小王" : "小徐"} · {cat.label}
+                  {t.date} · {ownerLabel(t.owner, members)} · {cat.label}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
@@ -531,15 +542,255 @@ function TransactionsPage({ transactions, onAdd, onEdit, onDelete }) {
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [perspective, setPerspective] = useState("total");
-  const [assets, setAssets] = useState(initialAssets);
-  const [transactions, setTransactions] = useState(initialTransactions);
+  const [token, setToken] = useState(() => localStorage.getItem("accessToken") || "");
+  const [me, setMe] = useState(null);
+  const [household, setHousehold] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [assets, setAssets] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({
+    identifier: "",
+    password: "",
+    email: "",
+    phone: "",
+    displayName: "",
+    householdName: "",
+  });
+  const [authError, setAuthError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const addAsset = (a) => setAssets((prev) => [...prev, a]);
-  const editAsset = (updated) => setAssets((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-  const deleteAsset = (id) => setAssets((prev) => prev.filter((a) => a.id !== id));
-  const addTransaction = (t) => setTransactions((prev) => [...prev, t]);
-  const editTransaction = (updated) => setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  const deleteTransaction = (id) => setTransactions((prev) => prev.filter((t) => t.id !== id));
+  const api = async (path, { method = "GET", body, timeoutMs = 10000 } = {}) => {
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      let res;
+      try {
+        res = await fetch(path, {
+          method,
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+          signal: controller.signal,
+        });
+      } catch (e) {
+        if (e?.name === "AbortError") throw new Error("请求超时，请稍后重试");
+        throw new Error("网络异常，请检查网络后重试");
+      }
+
+      if (res.status === 204) return null;
+      const text = await res.text();
+      let json = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+
+      if (!res.ok) {
+        const msg =
+          json?.message ||
+          (res.status === 401 ? "未登录或登录已过期" : "") ||
+          (res.status === 403 ? "无权限访问" : "") ||
+          (res.status === 404 ? "资源不存在" : "") ||
+          (res.status >= 500 ? "服务异常，请稍后重试" : "") ||
+          res.statusText ||
+          "请求失败";
+        throw new Error(msg);
+      }
+      return json;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
+  const nowMonth = new Date().toISOString().slice(0, 7);
+
+  const mapAssetFromApi = (a) => ({
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    owner: a.scope === "JOINT" ? "joint" : String(a.ownerUserId),
+    amount: Number(a.amount),
+    note: a.note || "",
+  });
+
+  const mapTxFromApi = (t) => ({
+    id: t.id,
+    type: t.direction === "INCOME" ? "income" : "expense",
+    category: t.category,
+    owner: t.scope === "JOINT" ? "joint" : String(t.ownerUserId),
+    amount: Number(t.amount),
+    note: t.note || "",
+    date: String(t.occurredAt).slice(0, 10),
+  });
+
+  const refreshAssets = async () => {
+    const list = await api("/api/assets");
+    setAssets(list.map(mapAssetFromApi));
+  };
+
+  const refreshTransactions = async (month = nowMonth) => {
+    const list = await api(`/api/transactions?month=${month}`);
+    setTransactions(list.map(mapTxFromApi));
+  };
+
+  const bootstrap = async () => {
+    const user = await api("/api/users/me");
+    const hm = await api("/api/households/me");
+    setMe(user);
+    setHousehold(hm.household);
+    setMembers(hm.members || []);
+    await refreshAssets();
+    await refreshTransactions(nowMonth);
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    setLoading(true);
+    bootstrap()
+      .catch(() => {
+        if (cancelled) return;
+        localStorage.removeItem("accessToken");
+        setToken("");
+        setMe(null);
+        setHousehold(null);
+        setMembers([]);
+        setAssets([]);
+        setTransactions([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  const logout = () => {
+    localStorage.removeItem("accessToken");
+    setToken("");
+    setMe(null);
+    setHousehold(null);
+    setMembers([]);
+    setAssets([]);
+    setTransactions([]);
+    setPage("dashboard");
+    setPerspective("total");
+  };
+
+  const submitAuth = async () => {
+    setAuthError("");
+    setLoading(true);
+    try {
+      const payload =
+        authMode === "login"
+          ? { identifier: authForm.identifier, password: authForm.password }
+          : {
+              email: authForm.email,
+              phone: authForm.phone,
+              password: authForm.password,
+              displayName: authForm.displayName,
+              householdName: authForm.householdName,
+            };
+      const res = await api(`/api/auth/${authMode === "login" ? "login" : "register"}`, {
+        method: "POST",
+        body: payload,
+      });
+      localStorage.setItem("accessToken", res.accessToken);
+      setToken(res.accessToken);
+      setMe(res.user);
+      setHousehold(res.household);
+      setMembers(res.members || []);
+      setPerspective("total");
+    } catch (e) {
+      setAuthError(e.message || "登录失败");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const buildAssetBody = (a) => {
+    const scope = a.owner === "joint" ? "JOINT" : "PERSONAL";
+    const type = (a.type || "").trim();
+    const name = (a.name || "").trim();
+    const amount = Number(a.amount);
+
+    if (!type) throw new Error("请选择资产类型");
+    if (!assetTypeConfig[type]) throw new Error("资产类型无效");
+    if (!name) throw new Error("请输入资产名称");
+    if (!Number.isFinite(amount)) throw new Error("请输入正确的金额");
+
+    const body = {
+      scope,
+      ownerUserId: null,
+      type,
+      name,
+      amount,
+      note: a.note ? String(a.note).trim() : null,
+    };
+
+    if (scope === "PERSONAL") {
+      const ownerUserId = Number(a.owner);
+      if (!Number.isFinite(ownerUserId)) throw new Error("请选择资产归属人");
+      body.ownerUserId = ownerUserId;
+    }
+    return body;
+  };
+
+  const addAsset = async (a) => {
+    const body = buildAssetBody(a);
+    await api("/api/assets", { method: "POST", body });
+    await refreshAssets();
+  };
+
+  const editAsset = async (a) => {
+    const body = buildAssetBody(a);
+    await api(`/api/assets/${a.id}`, { method: "PUT", body });
+    await refreshAssets();
+  };
+
+  const deleteAsset = async (id) => {
+    await api(`/api/assets/${id}`, { method: "DELETE" });
+    await refreshAssets();
+  };
+
+  const addTransaction = async (t) => {
+    const body = {
+      scope: t.owner === "joint" ? "JOINT" : "PERSONAL",
+      ownerUserId: t.owner === "joint" ? null : Number(t.owner),
+      direction: t.type === "income" ? "INCOME" : "EXPENSE",
+      category: t.category,
+      amount: t.amount,
+      occurredAt: `${t.date}T00:00:00`,
+      note: t.note,
+    };
+    await api("/api/transactions", { method: "POST", body });
+    await refreshTransactions(nowMonth);
+  };
+
+  const editTransaction = async (t) => {
+    const body = {
+      scope: t.owner === "joint" ? "JOINT" : "PERSONAL",
+      ownerUserId: t.owner === "joint" ? null : Number(t.owner),
+      direction: t.type === "income" ? "INCOME" : "EXPENSE",
+      category: t.category,
+      amount: t.amount,
+      occurredAt: `${t.date}T00:00:00`,
+      note: t.note,
+    };
+    await api(`/api/transactions/${t.id}`, { method: "PUT", body });
+    await refreshTransactions(nowMonth);
+  };
+
+  const deleteTransaction = async (id) => {
+    await api(`/api/transactions/${id}`, { method: "DELETE" });
+    await refreshTransactions(nowMonth);
+  };
 
   const navItems = [
     { id: "dashboard", icon: "📊", label: "总览" },
@@ -550,27 +801,133 @@ export default function App() {
   return (
     <div style={S.app}>
       <div style={S.nav}>
-        <span style={S.navTitle}>💑 共同资产</span>
-      </div>
-
-      {page === "dashboard" && (
-        <Dashboard assets={assets} transactions={transactions} perspective={perspective} setPerspective={setPerspective} />
-      )}
-      {page === "assets" && (
-        <AssetsPage assets={assets} onAdd={addAsset} onEdit={editAsset} onDelete={deleteAsset} />
-      )}
-      {page === "transactions" && (
-        <TransactionsPage transactions={transactions} onAdd={addTransaction} onEdit={editTransaction} onDelete={deleteTransaction} />
-      )}
-
-      <div style={S.bottomNav}>
-        {navItems.map((n) => (
-          <button key={n.id} style={S.navItem(page === n.id)} onClick={() => setPage(n.id)}>
-            <span style={{ fontSize: 24 }}>{n.icon}</span>
-            {n.label}
+        <span style={S.navTitle}>{household?.name ? `💑 ${household.name}` : "💑 共同资产"}</span>
+        {token && (
+          <button
+            onClick={logout}
+            style={{
+              position: "absolute",
+              right: 16,
+              border: "none",
+              background: "none",
+              color: "#007AFF",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            退出
           </button>
-        ))}
+        )}
       </div>
+
+      {!token ? (
+        <div style={S.page}>
+          <div style={{ ...S.card, marginTop: 10 }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+              <button style={S.seg(authMode === "login")} onClick={() => setAuthMode("login")}>登录</button>
+              <button style={S.seg(authMode === "register")} onClick={() => setAuthMode("register")}>注册</button>
+            </div>
+            {authMode === "login" ? (
+              <>
+                <input
+                  style={S.input}
+                  placeholder="邮箱或手机号"
+                  value={authForm.identifier}
+                  onChange={(e) => setAuthForm({ ...authForm, identifier: e.target.value })}
+                />
+                <input
+                  style={S.input}
+                  type="password"
+                  placeholder="密码"
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                />
+                {authError && <div style={{ color: "#FF3B30", fontSize: 13, marginBottom: 10 }}>{authError}</div>}
+                <button style={S.btn()} onClick={submitAuth} disabled={loading}>登录</button>
+              </>
+            ) : (
+              <>
+                <input
+                  style={S.input}
+                  placeholder="昵称"
+                  value={authForm.displayName}
+                  onChange={(e) => setAuthForm({ ...authForm, displayName: e.target.value })}
+                />
+                <input
+                  style={S.input}
+                  placeholder="邮箱（选填）"
+                  value={authForm.email}
+                  onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                />
+                <input
+                  style={S.input}
+                  placeholder="手机号（选填）"
+                  value={authForm.phone}
+                  onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
+                />
+                <input
+                  style={S.input}
+                  type="password"
+                  placeholder="密码"
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                />
+                <input
+                  style={S.input}
+                  placeholder="家庭名称（选填）"
+                  value={authForm.householdName}
+                  onChange={(e) => setAuthForm({ ...authForm, householdName: e.target.value })}
+                />
+                {authError && <div style={{ color: "#FF3B30", fontSize: 13, marginBottom: 10 }}>{authError}</div>}
+                <button style={S.btn("#34C759")} onClick={submitAuth} disabled={loading}>注册</button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {page === "dashboard" && (
+            <Dashboard
+              assets={assets}
+              transactions={transactions}
+              perspective={perspective}
+              setPerspective={setPerspective}
+              members={members}
+            />
+          )}
+          {page === "assets" && (
+            <AssetsPage
+              assets={assets}
+              members={members}
+              onAdd={addAsset}
+              onEdit={editAsset}
+              onDelete={deleteAsset}
+            />
+          )}
+          {page === "transactions" && (
+            <TransactionsPage
+              transactions={transactions}
+              members={members}
+              onAdd={addTransaction}
+              onEdit={editTransaction}
+              onDelete={deleteTransaction}
+            />
+          )}
+        </>
+      )}
+
+      {token && (
+        <div style={S.bottomNav}>
+          {navItems.map((n) => (
+            <button key={n.id} style={S.navItem(page === n.id)} onClick={() => setPage(n.id)}>
+              <span style={{ fontSize: 24 }}>{n.icon}</span>
+              {n.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

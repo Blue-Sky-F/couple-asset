@@ -1,7 +1,7 @@
 # 💑 共同资产记录 APP (Couple Asset Record APP)
 
 ## 项目概述
-这是一个专为情侣设计的共同资产管理 Web 应用。它允许用户记录和查看共同及各自的资产状况、收支流水，帮助情侣更好地规划财务。应用采用简洁的移动端优先设计，数据目前仅在本地会话中保存。
+这是一个专为情侣设计的共同资产管理 Web 应用。它允许用户注册/登录后记录和查看共同及各自的资产状况、收支流水，帮助情侣更好地规划财务。应用采用移动端优先设计，数据由后端服务写入 MySQL 做持久化存储。
 
 ## 功能需求
 
@@ -28,15 +28,15 @@
 - **统计**: 自动区分收入（绿色）和支出（红色）。
 
 ## 技术栈
-- **核心框架**: React 18
-- **构建工具**: Vite
-- **语言**: JavaScript (JSX)
-- **样式**: Inline Styles (纯 JS 对象样式，无外部 CSS 框架)
-- **数据存储**: 内存状态 (useState)，刷新页面会重置为初始数据。
+- **Web 前端**: React 18 + Vite + JavaScript (JSX)
+- **API 后端**: Java Spring Boot + Spring Security + Spring Data JPA + Flyway + JWT
+- **数据库**: MySQL
 
 ## 项目结构
 ```
 couple-asset/
+├── apps/
+│   └── api/           # Spring Boot 后端（API、认证、数据存储）
 ├── src/
 │   ├── App.jsx       # 核心应用逻辑与 UI 组件
 │   ├── main.jsx      # 入口文件
@@ -49,18 +49,42 @@ couple-asset/
 
 ## 本地运行
 
-1.  **安装依赖**
+### 1) 启动前端（Web）
+
+1. **安装依赖**
     ```bash
     npm install
     ```
 
-2.  **启动开发服务器**
+2. **启动开发服务器**
     ```bash
     npm run dev
     ```
 
-3.  **访问应用**
+3. **访问应用**
     浏览器打开 [http://localhost:5173](http://localhost:5173)
+
+### 2) 启动后端（API）
+
+前置条件：
+
+- 安装 Java 17+
+- 准备 MySQL（建议 utf8mb4），创建数据库 `couple_asset`
+
+环境变量（可选）：
+
+- `DB_URL`（默认 `jdbc:mysql://localhost:3306/couple_asset...`）
+- `DB_USER`（默认 `root`）
+- `DB_PASSWORD`（默认空）
+- `JWT_SECRET`（建议使用 32 字节以上随机串）
+
+后端工程位于 `apps/api`，首次启动会通过 Flyway 自动创建表结构。
+
+### 3) iOS/macOS 访问说明（开发期）
+
+- 同一台 Mac 上访问：前端默认 `http://localhost:5173`，后端默认 `http://localhost:8080`
+- iPhone 访问 Mac 上的开发服务器：需要让前端 dev server 监听局域网地址（例如使用 Vite 的 `--host`），并通过 `http://<你的Mac局域网IP>:5173` 访问
+- 后端已放开常见局域网来源的 CORS（`localhost/127.0.0.1/*.local/192.168.*.*/10.*.*.*`），以便 iOS Safari 调用 API
 
 ## 部署 (Vercel)
 
