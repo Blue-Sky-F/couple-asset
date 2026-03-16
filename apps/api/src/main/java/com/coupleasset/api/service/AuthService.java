@@ -68,15 +68,30 @@ public class AuthService {
     user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
     user = userRepo.save(user);
 
-    HouseholdEntity household = new HouseholdEntity();
     String householdName = normalize(req.getHouseholdName());
-    household.setName(householdName == null || householdName.isBlank() ? "家庭" : householdName);
-    household = householdRepo.save(household);
+    HouseholdEntity household;
+    HouseholdRole role;
+    if (householdName != null) {
+      household = householdRepo.findFirstByName(householdName).orElse(null);
+      if (household != null) {
+        role = HouseholdRole.MEMBER;
+      } else {
+        household = new HouseholdEntity();
+        household.setName(householdName);
+        household = householdRepo.save(household);
+        role = HouseholdRole.OWNER;
+      }
+    } else {
+      household = new HouseholdEntity();
+      household.setName("家庭");
+      household = householdRepo.save(household);
+      role = HouseholdRole.OWNER;
+    }
 
     HouseholdMemberEntity member = new HouseholdMemberEntity();
     member.setHouseholdId(household.getId());
     member.setUserId(user.getId());
-    member.setRole(HouseholdRole.OWNER);
+    member.setRole(role);
     memberRepo.save(member);
 
     String token = jwtService.issueAccessToken(user.getId());
@@ -117,4 +132,3 @@ public class AuthService {
     return new UserDto(u.getId(), u.getEmail(), u.getPhone(), u.getDisplayName(), u.getStatus().name());
   }
 }
-

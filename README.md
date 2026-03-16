@@ -80,6 +80,41 @@ couple-asset/
 
 后端工程位于 `apps/api`，首次启动会通过 Flyway 自动创建表结构。
 
+## 一键本地部署（推荐：Docker）
+
+前置条件：
+
+- 安装 Docker Desktop（macOS）
+
+启动：
+
+```bash
+docker compose up --build
+```
+
+访问：
+
+- Web：http://localhost:5173
+- API：http://localhost:8080/api/health
+
+试用（查看“小王/小徐”分别资产）
+
+- 第一个人注册时填写：昵称例如“小王”，家庭名称例如“我们家”（随便起一个你记得住的）
+- 第二个人注册时填写：昵称例如“小徐”，家庭名称填写**同一个“我们家”**
+- 登录后在「总览」顶部的分段按钮里会出现两个成员视角，分别点“小王/小徐”即可查看各自资产
+
+初始化演示数据（旧版内置基础数据同步）
+
+- Docker 默认会在首次启动时初始化一组演示数据到 MySQL：家庭「相遇半路」，成员「小王/小徐」，并同步旧版内置的资产与流水
+- 默认登录账号：`18098863002`（小王） / `18098863003`（小徐）
+- 默认密码：`12345678`
+- 如需改成你自己的值，修改 [docker-compose.yml](file:///Users/a1/projects/trae-project/couple-asset/docker-compose.yml) 里的 `APP_SEED_*` 环境变量，然后执行 `docker compose down -v && docker compose up -d --build`
+
+说明：
+
+- Web 容器通过 Nginx 同源代理 `/api/*` 到后端，不需要额外处理 CORS
+- MySQL 默认映射到本机 3306，数据库名 `couple_asset`（凭据见 [docker-compose.yml](file:///Users/a1/projects/trae-project/couple-asset/docker-compose.yml)）
+
 ### 3) iOS/macOS 访问说明（开发期）
 
 - 同一台 Mac 上访问：前端默认 `http://localhost:5173`，后端默认 `http://localhost:8080`

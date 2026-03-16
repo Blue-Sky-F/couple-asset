@@ -1,0 +1,51 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: couple_asset
+      MYSQL_USER: couple
+      MYSQL_PASSWORD: couplepass
+      MYSQL_ROOT_PASSWORD: rootpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-prootpass"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/couple_asset?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      DB_USER: couple
+      DB_PASSWORD: couplepass
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-dev-secret-dev-secret-dev-32bytes}
+      APP_SEED_ENABLED: "true"
+      APP_SEED_HOUSEHOLD_NAME: "相遇半路"
+      APP_SEED_USER1_NAME: "小王"
+      APP_SEED_USER1_PHONE: "18098863002"
+      APP_SEED_USER2_NAME: "小徐"
+      APP_SEED_USER2_PHONE: "18098863003"
+      APP_SEED_PASSWORD: "12345678"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+volumes:
+  mysql_data:

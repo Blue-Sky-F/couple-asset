@@ -25,3 +25,11 @@ app:
     issuer: couple-asset
     secret: ${JWT_SECRET:dev-secret-dev-secret-dev-secret-dev-32bytes}
     accessTokenMinutes: 120
+  seed:
+    enabled: ${APP_SEED_ENABLED:false}
+    householdName: ${APP_SEED_HOUSEHOLD_NAME:}
+    user1Name: ${APP_SEED_USER1_NAME:}
+    user1Phone: ${APP_SEED_USER1_PHONE:}
+    user2Name: ${APP_SEED_USER2_NAME:}
+    user2Phone: ${APP_SEED_USER2_PHONE:}
+    password: ${APP_SEED_PASSWORD:}
