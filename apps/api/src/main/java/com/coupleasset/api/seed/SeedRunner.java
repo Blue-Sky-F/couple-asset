@@ -108,15 +108,16 @@ public class SeedRunner implements ApplicationRunner {
   private void seedHistory(long householdId) {
     LocalDate now = LocalDate.now();
     BigDecimal base = new BigDecimal("3000000");
+    // Generate strictly increasing growth
     for (int i = 12; i >= 0; i--) {
       LocalDate date = now.minusMonths(i);
       String month = date.format(DateTimeFormatter.ofPattern("yyyy-MM"));
       AssetHistoryEntity h = new AssetHistoryEntity();
       h.setHouseholdId(householdId);
       h.setRecordMonth(month);
-      // Generate some fluctuation
-      BigDecimal variation = new BigDecimal(Math.sin(i) * 200000 + i * 50000);
-      h.setTotalAmount(base.add(variation));
+      // Strictly increasing: 1.004 ^ (12-i) growth approx 5% per year
+      double factor = Math.pow(1.004, 12 - i);
+      h.setTotalAmount(base.multiply(BigDecimal.valueOf(factor)));
       historyRepo.save(h);
     }
   }

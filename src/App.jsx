@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const assetTypeConfig = {
@@ -62,11 +62,14 @@ function DonutChart({ data, size = 120 }) {
 
 // ─── Line Chart ────────────────────────────────────────────────────────────
 function AssetLineChart({ data, height = 160 }) {
+  const [activeIdx, setActiveIdx] = useState(null);
+  const svgRef = useRef(null);
+
   if (!data || data.length === 0) {
     return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "#8E8E93", fontSize: 13 }}>暂无数据</div>;
   }
 
-  const padding = { top: 20, right: 10, bottom: 25, left: 55 };
+  const padding = { top: 30, right: 10, bottom: 25, left: 55 };
   const width = 360;
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
@@ -75,7 +78,6 @@ function AssetLineChart({ data, height = 160 }) {
   let minVal = Math.min(...amounts);
   let maxVal = Math.max(...amounts);
   
-  // Padding for min/max
   if (minVal === maxVal) {
     minVal = minVal * 0.9;
     maxVal = maxVal * 1.1;
@@ -89,11 +91,12 @@ function AssetLineChart({ data, height = 160 }) {
   const points = data.map((d, i) => ({
     x: padding.left + (data.length > 1 ? (i / (data.length - 1)) * chartWidth : chartWidth / 2),
     y: padding.top + chartHeight - ((Number(d.totalAmount) - minVal) / range) * chartHeight,
-    label: d.recordMonth.split("-")[1] + "月",
-    value: Number(d.totalAmount)
+    label: d.displayLabel || d.recordMonth,
+    displayLabel: d.displayLabel || d.recordMonth.split("-")[1] + "月",
+    value: Number(d.totalAmount),
+    isProjected: d.isProjected
   }));
 
-  // Create smooth path using Bezier curves
   const getCurvePath = (pts) => {
     if (pts.length < 2) return "";
     let d = `M ${pts[0].x} ${pts[0].y}`;
@@ -109,41 +112,93 @@ function AssetLineChart({ data, height = 160 }) {
   const pathD = data.length > 1 ? getCurvePath(points) : "";
   const areaD = data.length > 1 ? `${pathD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z` : "";
 
+  const handleInteraction = (e) => {
+    if (!svgRef.current || data.length < 1) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const x = ((e.clientX || (e.touches && e.touches[0].clientX)) - rect.left) * (width / rect.width);
+    
+    let closestIdx = 0;
+    let minDist = Math.abs(points[0].x - x);
+    points.forEach((p, i) => {
+      const dist = Math.abs(p.x - x);
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = i;
+      }
+    });
+    setActiveIdx(closestIdx);
+  };
+
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible" }}>
-      <defs>
-        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#007AFF" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#007AFF" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* Grid Lines */}
-      {[0, 0.5, 1].map(v => (
-        <line key={v} x1={padding.left} y1={padding.top + v * chartHeight} x2={width - padding.right} y2={padding.top + v * chartHeight} stroke="#F2F2F7" strokeWidth="1" />
-      ))}
-      {/* Area */}
-      {data.length > 1 && <path d={areaD} fill="url(#areaGradient)" />}
-      {/* Line */}
-      {data.length > 1 ? (
-        <path d={pathD} fill="none" stroke="#007AFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      ) : (
-        <circle cx={points[0].x} cy={points[0].y} r="4" fill="#007AFF" />
+    <div style={{ position: "relative" }}>
+      <svg 
+        ref={svgRef}
+        width="100%" height={height} viewBox={`0 0 ${width} ${height}`} 
+        style={{ overflow: "visible", touchAction: "none" }}
+        onMouseMove={handleInteraction}
+        onTouchMove={handleInteraction}
+        onMouseLeave={() => setActiveIdx(null)}
+        onTouchEnd={() => setActiveIdx(null)}
+      >
+        <defs>
+          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#007AFF" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="#007AFF" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        
+        {[0, 0.5, 1].map(v => (
+          <line key={v} x1={padding.left} y1={padding.top + v * chartHeight} x2={width - padding.right} y2={padding.top + v * chartHeight} stroke="#F2F2F7" strokeWidth="1" />
+        ))}
+        
+        {data.length > 1 && <path d={areaD} fill="url(#areaGradient)" />}
+        
+        {data.length > 1 ? (
+          <path d={pathD} fill="none" stroke="#007AFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <circle cx={points[0].x} cy={points[0].y} r="4" fill="#007AFF" />
+        )}
+
+        {activeIdx !== null && (
+          <line x1={points[activeIdx].x} y1={padding.top} x2={points[activeIdx].x} y2={padding.top + chartHeight} stroke="#007AFF" strokeWidth="1" strokeDasharray="4 2" />
+        )}
+
+        {data.length > 1 && points.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={activeIdx === i ? 5 : 3} fill={activeIdx === i ? "#007AFF" : "#fff"} stroke="#007AFF" strokeWidth="2" style={{ transition: "all 0.1s" }} />
+        ))}
+
+        {points.filter((_, i) => i % Math.ceil(data.length / 5) === 0 || i === data.length - 1).map((p, i) => (
+          <g key={i}>
+            <text x={p.x} y={height - 5} fontSize="10" fill="#8E8E93" textAnchor="middle">{p.displayLabel}</text>
+          </g>
+        ))}
+
+        {[minVal, (minVal + maxVal) / 2, maxVal].map((v, i) => (
+          <text key={i} x={padding.left - 8} y={padding.top + chartHeight - ((v - minVal) / range) * chartHeight + 4} fontSize="9" fill="#8E8E93" textAnchor="end">{fmtShort(v)}</text>
+        ))}
+      </svg>
+
+      {activeIdx !== null && (
+        <div style={{
+          position: "absolute",
+          top: points[activeIdx].y - 45,
+          left: Math.min(width - 80, Math.max(padding.left, points[activeIdx].x - 40)),
+          background: "rgba(28,28,30,0.9)",
+          color: "#fff",
+          padding: "4px 8px",
+          borderRadius: 6,
+          fontSize: 11,
+          pointerEvents: "none",
+          zIndex: 10,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          textAlign: "center",
+          backdropFilter: "blur(4px)"
+        }}>
+          <div style={{ opacity: 0.7, marginBottom: 2 }}>{points[activeIdx].label}</div>
+          <div style={{ fontWeight: 600 }}>{fmtShort(points[activeIdx].value)}</div>
+        </div>
       )}
-      {/* Points */}
-      {data.length > 1 && points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="3" fill="#fff" stroke="#007AFF" strokeWidth="2" />
-      ))}
-      {/* Labels */}
-      {points.filter((_, i) => i % Math.ceil(data.length / 5) === 0 || i === data.length - 1).map((p, i) => (
-        <g key={i}>
-          <text x={p.x} y={height - 5} fontSize="10" fill="#8E8E93" textAnchor="middle">{p.label}</text>
-        </g>
-      ))}
-      {/* Y Axis Labels */}
-      {[minVal, (minVal + maxVal) / 2, maxVal].map((v, i) => (
-        <text key={i} x={padding.left - 8} y={padding.top + chartHeight - ((v - minVal) / range) * chartHeight + 4} fontSize="9" fill="#8E8E93" textAnchor="end">{fmtShort(v)}</text>
-      ))}
-    </svg>
+    </div>
   );
 }
 
@@ -259,6 +314,9 @@ const S = {
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
 function Dashboard({ assets, perspective, setPerspective, members, historyData }) {
+  const [showTrend, setShowTrend] = useState(true);
+  const [viewMode, setViewMode] = useState("month"); // 'month' or 'year'
+
   const filter = (arr) =>
     perspective === "total" ? arr : arr.filter((a) => a.owner === perspective || a.owner === "joint");
 
@@ -294,6 +352,60 @@ function Dashboard({ assets, perspective, setPerspective, members, historyData }
     ...Object.fromEntries(members.map((m) => [String(m.userId), `${m.displayName}资产`])),
   };
 
+  const chartData = useMemo(() => {
+    const currentTotal = sum(filteredAssets.map(a => a.amount));
+    const now = new Date();
+    const currentYear = 2026; // Fixed per user requirement for year view
+    const currentMonthStr = now.toISOString().slice(0, 7);
+
+    if (viewMode === "year") {
+      const targetYears = [2021, 2022, 2023, 2024, 2025, 2026];
+      const realHistory = {};
+      historyData.forEach(h => {
+        const y = Number(h.recordMonth.split("-")[0]);
+        if (!realHistory[y] || h.recordMonth > realHistory[y].recordMonth) {
+          realHistory[y] = Number(h.totalAmount);
+        }
+      });
+
+      return targetYears.map(y => {
+        const displayLabel = `${y}年`;
+        if (y === 2026) return { recordMonth: "2026-12", displayLabel, totalAmount: currentTotal };
+        
+        if (realHistory[y] !== undefined) return { recordMonth: `${y}-12`, displayLabel, totalAmount: realHistory[y] };
+
+        // exponential back-projection (5% annual growth backwards)
+        const yearsBack = 2026 - y;
+        const projected = currentTotal / Math.pow(1.05, yearsBack);
+        return { recordMonth: `${y}-12`, displayLabel, totalAmount: projected, isProjected: true };
+      });
+    } else {
+      // Month view: Last 12 months
+      const months = [];
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(d.toISOString().slice(0, 7));
+      }
+
+      const realHistory = {};
+      historyData.forEach(h => {
+        realHistory[h.recordMonth] = Number(h.totalAmount);
+      });
+
+      return months.map((m, i) => {
+        const displayLabel = m.split("-")[1] + "月";
+        if (i === 11) return { recordMonth: m, displayLabel, totalAmount: currentTotal };
+
+        if (realHistory[m] !== undefined) return { recordMonth: m, displayLabel, totalAmount: realHistory[m] };
+
+        // exponential back-projection (approx 5% annual, 0.4% monthly growth backwards)
+        const monthsBack = 11 - i;
+        const projected = currentTotal / Math.pow(1.00407, monthsBack);
+        return { recordMonth: m, displayLabel, totalAmount: projected, isProjected: true };
+      });
+    }
+  }, [historyData, viewMode, filteredAssets]);
+
   return (
     <div style={S.page}>
       <div style={S.segControl}>
@@ -327,10 +439,37 @@ function Dashboard({ assets, perspective, setPerspective, members, historyData }
         )}
       </div>
 
-      {perspective === "total" && historyData.length > 0 && (
+      {perspective === "total" && (
         <div style={S.card}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#8E8E93", marginBottom: 12 }}>资产趋势</div>
-          <AssetLineChart data={historyData} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showTrend ? 12 : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#8E8E93" }}>资产趋势</span>
+              <div style={{ display: "flex", background: "rgba(118,118,128,0.08)", borderRadius: 6, padding: 2 }}>
+                {["month", "year"].map(m => (
+                  <button 
+                    key={m}
+                    onClick={() => setViewMode(m)}
+                    style={{
+                      border: "none", padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600,
+                      background: viewMode === m ? "#fff" : "transparent",
+                      color: viewMode === m ? "#007AFF" : "#8E8E93",
+                      boxShadow: viewMode === m ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {m === "month" ? "月" : "年"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowTrend(!showTrend)}
+              style={{ border: "none", background: "none", color: "#007AFF", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+            >
+              {showTrend ? "收起" : "展开"}
+            </button>
+          </div>
+          {showTrend && <AssetLineChart data={chartData} />}
         </div>
       )}
 
