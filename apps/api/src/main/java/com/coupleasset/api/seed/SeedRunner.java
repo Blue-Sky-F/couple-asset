@@ -10,6 +10,8 @@ import com.coupleasset.api.entity.TransactionDirection;
 import com.coupleasset.api.entity.TransactionEntity;
 import com.coupleasset.api.entity.UserEntity;
 import com.coupleasset.api.entity.UserStatus;
+import com.coupleasset.api.entity.AssetHistoryEntity;
+import com.coupleasset.api.repo.AssetHistoryRepository;
 import com.coupleasset.api.repo.AssetRepository;
 import com.coupleasset.api.repo.HouseholdMemberRepository;
 import com.coupleasset.api.repo.HouseholdRepository;
@@ -17,6 +19,7 @@ import com.coupleasset.api.repo.TransactionRepository;
 import com.coupleasset.api.repo.UserRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -32,6 +35,7 @@ public class SeedRunner implements ApplicationRunner {
   private final HouseholdMemberRepository memberRepo;
   private final AssetRepository assetRepo;
   private final TransactionRepository txRepo;
+  private final AssetHistoryRepository historyRepo;
   private final PasswordEncoder passwordEncoder;
 
   public SeedRunner(
@@ -41,6 +45,7 @@ public class SeedRunner implements ApplicationRunner {
       HouseholdMemberRepository memberRepo,
       AssetRepository assetRepo,
       TransactionRepository txRepo,
+      AssetHistoryRepository historyRepo,
       PasswordEncoder passwordEncoder) {
     this.props = props;
     this.userRepo = userRepo;
@@ -48,6 +53,7 @@ public class SeedRunner implements ApplicationRunner {
     this.memberRepo = memberRepo;
     this.assetRepo = assetRepo;
     this.txRepo = txRepo;
+    this.historyRepo = historyRepo;
     this.passwordEncoder = passwordEncoder;
   }
 
@@ -96,6 +102,23 @@ public class SeedRunner implements ApplicationRunner {
 
     seedAssets(household.getId(), user1.getId(), user2.getId());
     seedTransactions(household.getId(), user1.getId(), user2.getId());
+    seedHistory(household.getId());
+  }
+
+  private void seedHistory(long householdId) {
+    LocalDate now = LocalDate.now();
+    BigDecimal base = new BigDecimal("3000000");
+    for (int i = 12; i >= 0; i--) {
+      LocalDate date = now.minusMonths(i);
+      String month = date.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+      AssetHistoryEntity h = new AssetHistoryEntity();
+      h.setHouseholdId(householdId);
+      h.setRecordMonth(month);
+      // Generate some fluctuation
+      BigDecimal variation = new BigDecimal(Math.sin(i) * 200000 + i * 50000);
+      h.setTotalAmount(base.add(variation));
+      historyRepo.save(h);
+    }
   }
 
   private void seedAssets(long householdId, long user1Id, long user2Id) {
@@ -166,9 +189,12 @@ public class SeedRunner implements ApplicationRunner {
   private static AssetType mapAssetType(String legacyType, String name) {
     String t = legacyType == null ? "" : legacyType.trim().toLowerCase();
     String n = name == null ? "" : name;
-    if (n.toUpperCase().contains("ESOP")) return AssetType.ESOP;
-    if ("deposit".equals(t)) return AssetType.BANK;
+    if (n.toUpperCase().contains("ESOP")) return AssetType.STOCK;
+    if ("deposit".equals(t) || "cash".equals(t)) return AssetType.BANK;
     if ("stock".equals(t)) return AssetType.STOCK;
+    if ("dowry".equals(t)) return AssetType.DOWRY;
+    if ("loan".equals(t) || "receivable".equals(t)) return AssetType.LOAN;
+    if ("fund".equals(t)) return AssetType.FUND;
     return AssetType.OTHER;
   }
 

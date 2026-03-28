@@ -21,12 +21,17 @@ public class AssetService {
   private final AssetRepository assetRepo;
   private final HouseholdService householdService;
   private final HouseholdMemberRepository memberRepo;
+  private final AssetHistoryService historyService;
 
   public AssetService(
-      AssetRepository assetRepo, HouseholdService householdService, HouseholdMemberRepository memberRepo) {
+      AssetRepository assetRepo,
+      HouseholdService householdService,
+      HouseholdMemberRepository memberRepo,
+      AssetHistoryService historyService) {
     this.assetRepo = assetRepo;
     this.householdService = householdService;
     this.memberRepo = memberRepo;
+    this.historyService = historyService;
   }
 
   public List<AssetDto> list(long userId, String scope, Long ownerUserId) {
@@ -45,7 +50,9 @@ public class AssetService {
     AssetEntity a = new AssetEntity();
     a.setHouseholdId(householdId);
     apply(a, householdId, req.getScope(), req.getOwnerUserId(), req.getType(), req.getName(), req.getAmount(), req.getNote());
-    return toDto(assetRepo.save(a));
+    AssetDto dto = toDto(assetRepo.save(a));
+    historyService.syncCurrentMonthHistory(householdId);
+    return dto;
   }
 
   @Transactional
@@ -53,7 +60,9 @@ public class AssetService {
     long householdId = householdService.requireHouseholdIdByUserId(userId);
     AssetEntity a = requireOwned(assetId, householdId);
     apply(a, householdId, req.getScope(), req.getOwnerUserId(), req.getType(), req.getName(), req.getAmount(), req.getNote());
-    return toDto(a);
+    AssetDto dto = toDto(a);
+    historyService.syncCurrentMonthHistory(householdId);
+    return dto;
   }
 
   @Transactional
@@ -61,6 +70,7 @@ public class AssetService {
     long householdId = householdService.requireHouseholdIdByUserId(userId);
     AssetEntity a = requireOwned(assetId, householdId);
     assetRepo.delete(a);
+    historyService.syncCurrentMonthHistory(householdId);
   }
 
   private AssetEntity requireOwned(long assetId, long householdId) {

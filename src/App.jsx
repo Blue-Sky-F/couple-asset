@@ -2,29 +2,12 @@ import { useEffect, useState } from "react";
 
 // ─── Config ────────────────────────────────────────────────────────────────
 const assetTypeConfig = {
-  CASH:  { label: "现金", icon: "💵", color: "#34C759" },
   BANK:  { label: "存款", icon: "🏦", color: "#007AFF" },
   STOCK: { label: "股票", icon: "📈", color: "#34C759" },
-  ESOP:  { label: "ESOP", icon: "📊", color: "#5AC8FA" },
+  DOWRY: { label: "嫁妆", icon: "👰", color: "#FF2D55" },
+  FUND:  { label: "基金", icon: "📊", color: "#5AC8FA" },
+  LOAN:  { label: "借款", icon: "💸", color: "#FF9500" },
   OTHER: { label: "其他", icon: "📦", color: "#8E8E93" },
-};
-
-const txCategoryConfig = {
-  // Income
-  salary:     { label: "工资", icon: "💼" },
-  bonus:      { label: "奖金", icon: "🏆" },
-  dividend:   { label: "分红", icon: "💰" },
-  investment: { label: "投资收益", icon: "📈" },
-  income_other: { label: "其他(收入)", icon: "📌" },
-  // Expense
-  rent:       { label: "房租", icon: "🏠" },
-  water:      { label: "水电", icon: "💧" },
-  car:        { label: "车贷", icon: "🚗" },
-  food:       { label: "伙食", icon: "🍚" },
-  dining:     { label: "请客吃饭", icon: "🍽️" },
-  shopping:   { label: "购物", icon: "🛍️" },
-  redpacket:  { label: "春节红包", icon: "🧧" },
-  other:      { label: "其他", icon: "📌" },
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -73,6 +56,93 @@ function DonutChart({ data, size = 120 }) {
           strokeDashoffset={-s.offset} strokeLinecap="round" />
       ))}
       <circle cx={cx} cy={cy} r={28} fill="rgba(255,255,255,0.06)" />
+    </svg>
+  );
+}
+
+// ─── Line Chart ────────────────────────────────────────────────────────────
+function AssetLineChart({ data, height = 160 }) {
+  if (!data || data.length === 0) {
+    return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "#8E8E93", fontSize: 13 }}>暂无数据</div>;
+  }
+
+  const padding = { top: 20, right: 10, bottom: 25, left: 55 };
+  const width = 360;
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const amounts = data.map(d => Number(d.totalAmount));
+  let minVal = Math.min(...amounts);
+  let maxVal = Math.max(...amounts);
+  
+  // Padding for min/max
+  if (minVal === maxVal) {
+    minVal = minVal * 0.9;
+    maxVal = maxVal * 1.1;
+  } else {
+    const diff = maxVal - minVal;
+    minVal = Math.max(0, minVal - diff * 0.2);
+    maxVal = maxVal + diff * 0.2;
+  }
+  const range = maxVal - minVal;
+
+  const points = data.map((d, i) => ({
+    x: padding.left + (data.length > 1 ? (i / (data.length - 1)) * chartWidth : chartWidth / 2),
+    y: padding.top + chartHeight - ((Number(d.totalAmount) - minVal) / range) * chartHeight,
+    label: d.recordMonth.split("-")[1] + "月",
+    value: Number(d.totalAmount)
+  }));
+
+  // Create smooth path using Bezier curves
+  const getCurvePath = (pts) => {
+    if (pts.length < 2) return "";
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const cp1x = p0.x + (p1.x - p0.x) / 2;
+      d += ` C ${cp1x} ${p0.y}, ${cp1x} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  };
+
+  const pathD = data.length > 1 ? getCurvePath(points) : "";
+  const areaD = data.length > 1 ? `${pathD} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z` : "";
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: "visible" }}>
+      <defs>
+        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#007AFF" stopOpacity="0.2" />
+          <stop offset="100%" stopColor="#007AFF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Grid Lines */}
+      {[0, 0.5, 1].map(v => (
+        <line key={v} x1={padding.left} y1={padding.top + v * chartHeight} x2={width - padding.right} y2={padding.top + v * chartHeight} stroke="#F2F2F7" strokeWidth="1" />
+      ))}
+      {/* Area */}
+      {data.length > 1 && <path d={areaD} fill="url(#areaGradient)" />}
+      {/* Line */}
+      {data.length > 1 ? (
+        <path d={pathD} fill="none" stroke="#007AFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <circle cx={points[0].x} cy={points[0].y} r="4" fill="#007AFF" />
+      )}
+      {/* Points */}
+      {data.length > 1 && points.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3" fill="#fff" stroke="#007AFF" strokeWidth="2" />
+      ))}
+      {/* Labels */}
+      {points.filter((_, i) => i % Math.ceil(data.length / 5) === 0 || i === data.length - 1).map((p, i) => (
+        <g key={i}>
+          <text x={p.x} y={height - 5} fontSize="10" fill="#8E8E93" textAnchor="middle">{p.label}</text>
+        </g>
+      ))}
+      {/* Y Axis Labels */}
+      {[minVal, (minVal + maxVal) / 2, maxVal].map((v, i) => (
+        <text key={i} x={padding.left - 8} y={padding.top + chartHeight - ((v - minVal) / range) * chartHeight + 4} fontSize="9" fill="#8E8E93" textAnchor="end">{fmtShort(v)}</text>
+      ))}
     </svg>
   );
 }
@@ -188,12 +258,14 @@ const S = {
 };
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
-function Dashboard({ assets, transactions, perspective, setPerspective, members }) {
+function Dashboard({ assets, perspective, setPerspective, members, historyData }) {
   const filter = (arr) =>
     perspective === "total" ? arr : arr.filter((a) => a.owner === perspective || a.owner === "joint");
 
   const filteredAssets = filter(assets);
   const total = sum(filteredAssets.map((a) => a.amount));
+
+  const jointTotal = sum(assets.filter((a) => a.owner === "joint").map((a) => a.amount));
   const byMember = members.map((m) => ({
     userId: m.userId,
     displayName: m.displayName,
@@ -222,11 +294,6 @@ function Dashboard({ assets, transactions, perspective, setPerspective, members 
     ...Object.fromEntries(members.map((m) => [String(m.userId), `${m.displayName}资产`])),
   };
 
-  const now = new Date().toISOString().slice(0, 7);
-  const monthIncome = sum(transactions.filter((t) => t.type === "income" && t.date.startsWith(now)).map((t) => t.amount));
-  const monthExpense = sum(transactions.filter((t) => t.type === "expense" && t.date.startsWith(now)).map((t) => t.amount));
-  const recentTx = filter(transactions).slice().reverse().slice(0, 6);
-
   return (
     <div style={S.page}>
       <div style={S.segControl}>
@@ -246,6 +313,10 @@ function Dashboard({ assets, transactions, perspective, setPerspective, members 
         <div style={S.heroAmount}>{fmtShort(total)}</div>
         {perspective === "total" && (
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            <div key="joint">
+              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 2 }}>公共</div>
+              <div style={{ fontSize: 17, fontWeight: 600 }}>{fmtShort(jointTotal)}</div>
+            </div>
             {byMember.map((m) => (
               <div key={m.userId}>
                 <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 2 }}>{m.displayName}</div>
@@ -256,16 +327,12 @@ function Dashboard({ assets, transactions, perspective, setPerspective, members 
         )}
       </div>
 
-      <div style={S.grid2}>
-        <div style={S.miniCard}>
-          <div style={S.miniLabel}>本月收入</div>
-          <div style={{ ...S.miniNum, color: "#34C759" }}>+{fmtShort(monthIncome || 0)}</div>
+      {perspective === "total" && historyData.length > 0 && (
+        <div style={S.card}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#8E8E93", marginBottom: 12 }}>资产趋势</div>
+          <AssetLineChart data={historyData} />
         </div>
-        <div style={S.miniCard}>
-          <div style={S.miniLabel}>本月支出</div>
-          <div style={{ ...S.miniNum, color: "#FF3B30" }}>-{fmtShort(monthExpense || 0)}</div>
-        </div>
-      </div>
+      )}
 
       {byType.length > 0 && (
         <div style={{ ...S.card, display: "flex", alignItems: "center", gap: 16 }}>
@@ -283,34 +350,6 @@ function Dashboard({ assets, transactions, perspective, setPerspective, members 
           </div>
         </div>
       )}
-
-      <div style={{ ...S.card, padding: 0 }}>
-        <div style={{ padding: "14px 16px 6px", fontSize: 13, fontWeight: 600, color: "#8E8E93", letterSpacing: 0.3 }}>
-          最近流水
-        </div>
-        {recentTx.length === 0 && (
-          <div style={{ padding: "20px 16px", color: "#8E8E93", fontSize: 14, textAlign: "center" }}>暂无记录</div>
-        )}
-        {recentTx.map((t, i) => {
-          const cat = txCategoryConfig[t.category] || txCategoryConfig.other;
-          return (
-            <div key={t.id} style={{ ...S.listItem, borderTop: i === 0 ? "1px solid #F2F2F7" : "none", borderBottom: "none" }}>
-              <div style={S.iconBubble(t.type === "income" ? "#34C759" : "#FF3B30")}>{cat.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {t.note || cat.label}
-                </div>
-                <div style={{ fontSize: 12, color: "#8E8E93", marginTop: 2 }}>
-                  {t.date} · {ownerLabel(t.owner, members)}
-                </div>
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.type === "income" ? "#34C759" : "#FF3B30", marginLeft: 8, flexShrink: 0 }}>
-                {t.type === "income" ? "+" : "-"}{fmtShort(t.amount)}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -423,121 +462,6 @@ function AssetsPage({ assets, members, onAdd, onEdit, onDelete }) {
   );
 }
 
-// ─── Transactions Page ─────────────────────────────────────────────────────
-function TransactionsPage({ transactions, members, onAdd, onEdit, onDelete }) {
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [txType, setTxType] = useState("income");
-  const [form, setForm] = useState({
-    category: "salary", owner: "joint", amount: "", note: "",
-    date: new Date().toISOString().slice(0, 10),
-  });
-
-  const toggleForm = () => {
-    if (showForm) {
-      setEditingId(null);
-      setForm({ category: "salary", owner: "joint", amount: "", note: "", date: new Date().toISOString().slice(0, 10) });
-    }
-    setShowForm(!showForm);
-  };
-
-  const handleSubmit = () => {
-    if (!form.amount) return;
-    if (editingId) {
-      onEdit({ ...form, type: txType, amount: parseFloat(form.amount), id: editingId });
-    } else {
-      onAdd({ ...form, type: txType, amount: parseFloat(form.amount), id: Date.now() });
-    }
-    setEditingId(null);
-    setForm({ category: "salary", owner: "male", amount: "", note: "", date: new Date().toISOString().slice(0, 10) });
-    setShowForm(false);
-  };
-
-  const handleEdit = (tx) => {
-    setTxType(tx.type);
-    setForm({ ...tx, amount: tx.amount });
-    setEditingId(tx.id);
-    setShowForm(true);
-  };
-
-  return (
-    <div style={S.page}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <span style={{ fontSize: 20, fontWeight: 700 }}>收支记录</span>
-        <button onClick={toggleForm} style={{ ...S.btn("#007AFF"), width: "auto", padding: "8px 18px", fontSize: 14, borderRadius: 20 }}>
-          {showForm ? "取消" : "+ 记一笔"}
-        </button>
-      </div>
-
-      {showForm && (
-        <div style={{ ...S.card, marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>{editingId ? "编辑收支" : "新增收支"}</div>
-          <div style={S.segControl}>
-            <button style={S.seg(txType === "income")} onClick={() => setTxType("income")}>💰 收入</button>
-            <button style={S.seg(txType === "expense")} onClick={() => setTxType("expense")}>💸 支出</button>
-          </div>
-          <select style={S.select} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-            {Object.entries(txCategoryConfig)
-              .filter(([k]) => {
-                if (txType === "income") {
-                  return ["salary", "bonus", "dividend", "investment", "income_other"].includes(k);
-                } else {
-                  return ["rent", "water", "car", "food", "dining", "shopping", "redpacket", "other"].includes(k);
-                }
-              })
-              .map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
-          </select>
-          <select style={S.select} value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })}>
-            <option value="joint">👫 共同</option>
-            {members.map((m) => (
-              <option key={m.userId} value={String(m.userId)}>{m.displayName}</option>
-            ))}
-          </select>
-          <input style={S.input} type="number" placeholder="金额（元）" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-          <input style={S.input} placeholder="备注" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-          <input style={S.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-          <button style={S.btn(txType === "income" ? "#34C759" : "#FF3B30")} onClick={handleSubmit}>{editingId ? "确认修改" : "确认添加"}</button>
-        </div>
-      )}
-
-      <div style={{ ...S.card, padding: 0 }}>
-        {transactions.slice().reverse().map((t, i) => {
-          const cat = txCategoryConfig[t.category] || txCategoryConfig.other;
-          return (
-            <div key={t.id} style={{ ...S.listItem, borderTop: i === 0 ? "none" : "1px solid #F2F2F7", borderBottom: "none" }}>
-              <div style={S.iconBubble(t.type === "income" ? "#34C759" : "#FF3B30")}>{cat.icon}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {t.note || cat.label}
-                </div>
-                <div style={{ fontSize: 12, color: "#8E8E93", marginTop: 2 }}>
-                  {t.date} · {ownerLabel(t.owner, members)} · {cat.label}
-                </div>
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: t.type === "income" ? "#34C759" : "#FF3B30" }}>
-                  {t.type === "income" ? "+" : "-"}{fmtShort(t.amount)}
-                </div>
-                <div style={{ marginTop: 2 }}>
-                  <button onClick={() => handleEdit(t)} style={{ fontSize: 11, color: "#007AFF", background: "none", border: "none", cursor: "pointer", padding: "0 8px 0 0", fontFamily: "inherit" }}>
-                    编辑
-                  </button>
-                  <button onClick={() => onDelete(t.id)} style={{ fontSize: 11, color: "#FF3B30", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                    删除
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {transactions.length === 0 && (
-          <div style={{ padding: "30px 16px", color: "#8E8E93", fontSize: 14, textAlign: "center" }}>暂无记录，点击「记一笔」开始</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Root App ──────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("dashboard");
@@ -547,7 +471,7 @@ export default function App() {
   const [household, setHousehold] = useState(null);
   const [members, setMembers] = useState([]);
   const [assets, setAssets] = useState([]);
-  const [transactions, setTransactions] = useState([]);
+  const [historyData, setHistoryData] = useState([]);
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({
     identifier: "",
@@ -606,25 +530,13 @@ export default function App() {
     }
   };
 
-  const nowMonth = new Date().toISOString().slice(0, 7);
-
   const mapAssetFromApi = (a) => ({
     id: a.id,
     name: a.name,
-    type: a.type,
+    type: a.type === "CASH" ? "BANK" : a.type,
     owner: a.scope === "JOINT" ? "joint" : String(a.ownerUserId),
     amount: Number(a.amount),
     note: a.note || "",
-  });
-
-  const mapTxFromApi = (t) => ({
-    id: t.id,
-    type: t.direction === "INCOME" ? "income" : "expense",
-    category: t.category,
-    owner: t.scope === "JOINT" ? "joint" : String(t.ownerUserId),
-    amount: Number(t.amount),
-    note: t.note || "",
-    date: String(t.occurredAt).slice(0, 10),
   });
 
   const refreshAssets = async () => {
@@ -632,9 +544,9 @@ export default function App() {
     setAssets(list.map(mapAssetFromApi));
   };
 
-  const refreshTransactions = async (month = nowMonth) => {
-    const list = await api(`/api/transactions?month=${month}`);
-    setTransactions(list.map(mapTxFromApi));
+  const refreshHistory = async () => {
+    const list = await api("/api/stats/asset-history");
+    setHistoryData(list || []);
   };
 
   const bootstrap = async () => {
@@ -644,7 +556,7 @@ export default function App() {
     setHousehold(hm.household);
     setMembers(hm.members || []);
     await refreshAssets();
-    await refreshTransactions(nowMonth);
+    await refreshHistory();
   };
 
   useEffect(() => {
@@ -660,7 +572,6 @@ export default function App() {
         setHousehold(null);
         setMembers([]);
         setAssets([]);
-        setTransactions([]);
       })
       .finally(() => {
         if (cancelled) return;
@@ -678,7 +589,6 @@ export default function App() {
     setHousehold(null);
     setMembers([]);
     setAssets([]);
-    setTransactions([]);
     setPage("dashboard");
     setPerspective("total");
   };
@@ -746,56 +656,25 @@ export default function App() {
     const body = buildAssetBody(a);
     await api("/api/assets", { method: "POST", body });
     await refreshAssets();
+    await refreshHistory();
   };
 
   const editAsset = async (a) => {
     const body = buildAssetBody(a);
     await api(`/api/assets/${a.id}`, { method: "PUT", body });
     await refreshAssets();
+    await refreshHistory();
   };
 
   const deleteAsset = async (id) => {
     await api(`/api/assets/${id}`, { method: "DELETE" });
     await refreshAssets();
-  };
-
-  const addTransaction = async (t) => {
-    const body = {
-      scope: t.owner === "joint" ? "JOINT" : "PERSONAL",
-      ownerUserId: t.owner === "joint" ? null : Number(t.owner),
-      direction: t.type === "income" ? "INCOME" : "EXPENSE",
-      category: t.category,
-      amount: t.amount,
-      occurredAt: `${t.date}T00:00:00`,
-      note: t.note,
-    };
-    await api("/api/transactions", { method: "POST", body });
-    await refreshTransactions(nowMonth);
-  };
-
-  const editTransaction = async (t) => {
-    const body = {
-      scope: t.owner === "joint" ? "JOINT" : "PERSONAL",
-      ownerUserId: t.owner === "joint" ? null : Number(t.owner),
-      direction: t.type === "income" ? "INCOME" : "EXPENSE",
-      category: t.category,
-      amount: t.amount,
-      occurredAt: `${t.date}T00:00:00`,
-      note: t.note,
-    };
-    await api(`/api/transactions/${t.id}`, { method: "PUT", body });
-    await refreshTransactions(nowMonth);
-  };
-
-  const deleteTransaction = async (id) => {
-    await api(`/api/transactions/${id}`, { method: "DELETE" });
-    await refreshTransactions(nowMonth);
+    await refreshHistory();
   };
 
   const navItems = [
     { id: "dashboard", icon: "📊", label: "总览" },
     { id: "assets",    icon: "💎", label: "资产" },
-    { id: "transactions", icon: "📝", label: "收支" },
   ];
 
   return (
@@ -891,10 +770,10 @@ export default function App() {
           {page === "dashboard" && (
             <Dashboard
               assets={assets}
-              transactions={transactions}
               perspective={perspective}
               setPerspective={setPerspective}
               members={members}
+              historyData={historyData}
             />
           )}
           {page === "assets" && (
@@ -904,15 +783,6 @@ export default function App() {
               onAdd={addAsset}
               onEdit={editAsset}
               onDelete={deleteAsset}
-            />
-          )}
-          {page === "transactions" && (
-            <TransactionsPage
-              transactions={transactions}
-              members={members}
-              onAdd={addTransaction}
-              onEdit={editTransaction}
-              onDelete={deleteTransaction}
             />
           )}
         </>
