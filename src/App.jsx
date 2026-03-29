@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 
 // ─── Config ────────────────────────────────────────────────────────────────
+const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
+
 const assetTypeConfig = {
   BANK:  { label: "存款", icon: "🏦", color: "#007AFF" },
   STOCK: { label: "股票", icon: "📈", color: "#34C759" },
@@ -605,7 +607,7 @@ function AssetsPage({ assets, members, onAdd, onEdit, onDelete }) {
 export default function App() {
   const [page, setPage] = useState("dashboard");
   const [perspective, setPerspective] = useState("total");
-  const [token, setToken] = useState(() => localStorage.getItem("accessToken") || "");
+  const [token, setToken] = useState(() => (authDisabled ? "" : localStorage.getItem("accessToken") || ""));
   const [me, setMe] = useState(null);
   const [household, setHousehold] = useState(null);
   const [members, setMembers] = useState([]);
@@ -625,7 +627,8 @@ export default function App() {
 
   const api = async (path, { method = "GET", body, timeoutMs = 10000 } = {}) => {
     const headers = { "Content-Type": "application/json" };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    const isAuthPath = path.startsWith("/api/auth/");
+    if (token && !isAuthPath) headers.Authorization = `Bearer ${token}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -699,7 +702,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!token) return;
+    if (!token && !authDisabled) return;
     let cancelled = false;
     setLoading(true);
     bootstrap()
@@ -820,7 +823,7 @@ export default function App() {
     <div style={S.app}>
       <div style={S.nav}>
         <span style={S.navTitle}>{household?.name ? `💑 ${household.name}` : "💑 共同资产"}</span>
-        {token && (
+        {token && !authDisabled && (
           <button
             onClick={logout}
             style={{
@@ -840,7 +843,7 @@ export default function App() {
         )}
       </div>
 
-      {!token ? (
+      {!token && !authDisabled ? (
         <div style={S.page}>
           <div style={{ ...S.card, marginTop: 10 }}>
             <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -927,7 +930,7 @@ export default function App() {
         </>
       )}
 
-      {token && (
+      {(token || authDisabled) && (
         <div style={S.bottomNav}>
           {navItems.map((n) => (
             <button key={n.id} style={S.navItem(page === n.id)} onClick={() => setPage(n.id)}>

@@ -33,3 +33,6 @@ app:
     user2Name: ${APP_SEED_USER2_NAME:}
     user2Phone: ${APP_SEED_USER2_PHONE:}
     password: ${APP_SEED_PASSWORD:}
+  dev-auth:
+    enabled: ${APP_DEV_AUTH_ENABLED:false}
+    userId: ${APP_DEV_AUTH_USER_ID:1}

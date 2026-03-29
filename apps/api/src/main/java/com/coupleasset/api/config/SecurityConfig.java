@@ -1,6 +1,7 @@
 package com.coupleasset.api.config;
 
 import com.coupleasset.api.auth.JwtAuthFilter;
+import com.coupleasset.api.auth.DevAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -12,9 +13,11 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
   private final JwtAuthFilter jwtAuthFilter;
+  private final DevAuthFilter devAuthFilter;
 
-  public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+  public SecurityConfig(JwtAuthFilter jwtAuthFilter, DevAuthFilter devAuthFilter) {
     this.jwtAuthFilter = jwtAuthFilter;
+    this.devAuthFilter = devAuthFilter;
   }
 
   @Bean
@@ -26,6 +29,7 @@ public class SecurityConfig {
         auth ->
             auth.requestMatchers("/api/health", "/api/auth/**").permitAll().anyRequest().authenticated());
     http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    http.addFilterAfter(devAuthFilter, JwtAuthFilter.class);
     return http.build();
   }
 }
