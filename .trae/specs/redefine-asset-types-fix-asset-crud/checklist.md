@@ -1,0 +1,7 @@
+- [x] 后端 AssetType 仅包含 BANK/STOCK/FUND/DOWRY/LOAN/OTHER
+- [x] Flyway 迁移已将 CASH→BANK、ESOP→STOCK，且不会导致 JPA 枚举反序列化失败
+- [x] 前端资产类型展示为“存款/股票/基金/嫁妆/借款/其他”，且资产列表分组正确
+- [x] 登录后可新增资产（POST /api/assets 返回 200）
+- [x] 登录后可编辑资产（PUT /api/assets/{id} 返回 200，数据更新）
+- [x] 登录后可删除资产（DELETE /api/assets/{id} 返回 200/204，列表移除）
+- [x] 资产编辑/删除不再出现前端报错弹窗或后端 500

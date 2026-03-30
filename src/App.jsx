@@ -675,7 +675,7 @@ export default function App() {
   const mapAssetFromApi = (a) => ({
     id: a.id,
     name: a.name,
-    type: a.type === "CASH" ? "BANK" : a.type,
+    type: a.type === "CASH" ? "BANK" : a.type === "ESOP" ? "STOCK" : a.type,
     owner: a.scope === "JOINT" ? "joint" : String(a.ownerUserId),
     amount: Number(a.amount),
     note: a.note || "",

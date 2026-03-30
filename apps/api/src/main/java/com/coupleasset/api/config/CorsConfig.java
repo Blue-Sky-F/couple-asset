@@ -15,10 +15,15 @@ public class CorsConfig {
     config.setAllowedOriginPatterns(
         List.of(
             "http://localhost:5173",
+            "http://localhost:9000",
             "http://127.0.0.1:5173",
+            "http://127.0.0.1:9000",
             "http://*.local:5173",
+            "http://*.local:9000",
             "http://192.168.*.*:5173",
-            "http://10.*.*.*:5173"));
+            "http://192.168.*.*:9000",
+            "http://10.*.*.*:5173",
+            "http://10.*.*.*:9000"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*"));
     config.setAllowCredentials(true);
