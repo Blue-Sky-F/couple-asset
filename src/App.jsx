@@ -541,8 +541,40 @@ function AssetsPage({ assets, members, onAdd, onEdit, onDelete }) {
       </div>
 
       {showForm && (
-        <div style={{ ...S.card, marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>{editingId ? "编辑资产" : "新增资产"}</div>
+        <div
+          style={
+            editingId
+              ? {
+                  position: "fixed",
+                  inset: 0,
+                  background: "rgba(0,0,0,0.35)",
+                  zIndex: 300,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-start",
+                  padding: 16,
+                  paddingTop: 70,
+                }
+              : { marginBottom: 16 }
+          }
+          onClick={editingId ? toggleForm : undefined}
+        >
+          <div
+            style={
+              editingId
+                ? { ...S.card, width: "100%", maxWidth: 430, margin: 0 }
+                : { ...S.card }
+            }
+            onClick={editingId ? (e) => e.stopPropagation() : undefined}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{editingId ? "编辑资产" : "新增资产"}</div>
+              {editingId && (
+                <button onClick={toggleForm} style={{ fontSize: 12, color: "#007AFF", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                  取消
+                </button>
+              )}
+            </div>
           <input style={S.input} placeholder="资产名称" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <select style={S.select} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
             {Object.entries(assetTypeConfig).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
@@ -556,6 +588,7 @@ function AssetsPage({ assets, members, onAdd, onEdit, onDelete }) {
           <input style={S.input} type="number" placeholder="金额（元）" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
           <input style={S.input} placeholder="备注（选填）" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           <button style={S.btn()} onClick={handleSubmit}>{editingId ? "确认修改" : "确认添加"}</button>
+          </div>
         </div>
       )}
 
